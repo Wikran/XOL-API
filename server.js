@@ -1,21 +1,43 @@
-import express from "express";
-import sqlite3 from "sqlite3";
-import { open } from "sqlite";
-import fs from "fs";
+// ------------------------------------------------------
+// 1) Import modules (CommonJS for Render/Railway)
+// ------------------------------------------------------
+const express = require("express");
+const cors = require("cors");
+const sqlite3 = require("sqlite3");
+const { open } = require("sqlite");
+const fs = require("fs");
+const path = require("path");
 
+// ------------------------------------------------------
+// 2) Create Express app
+// ------------------------------------------------------
 const app = express();
+app.use(cors());
 app.use(express.json());
 
-// Load your JSON model
-const model = JSON.parse(fs.readFileSync("XOLModelCtl.json", "utf8"));
+// ------------------------------------------------------
+// 3) Load JSON model
+// ------------------------------------------------------
+const modelPath = path.join(__dirname, "XOLModelCtl.json");
+const model = JSON.parse(fs.readFileSync(modelPath, "utf8"));
 
-// Open SQLite database
-const db = await open({
-  filename: "xol.db",
-  driver: sqlite3.Database
-});
+// ------------------------------------------------------
+// 4) Initialize SQLite (must be inside async function)
+// ------------------------------------------------------
+let db;
 
-// Generic DMQ endpoint (matches your C# API)
+async function initDatabase() {
+  db = await open({
+    filename: path.join(__dirname, "xol.db"),
+    driver: sqlite3.Database
+  });
+
+  console.log("SQLite database loaded successfully");
+}
+
+// ------------------------------------------------------
+// 5) DMQ endpoint (matches your C# API)
+// ------------------------------------------------------
 app.post("/DMQ/:project/:xtgo/:tbxx/all", async (req, res) => {
   try {
     const { tbxx } = req.params;
@@ -46,13 +68,18 @@ app.post("/DMQ/:project/:xtgo/:tbxx/all", async (req, res) => {
     res.json(rows);
 
   } catch (err) {
-    console.error(err);
+    console.error("DMQ error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// Start server
-app.listen(3000, () => {
-  console.log("XOL API running on port 3000");
-});
+// ------------------------------------------------------
+// 6) PORT + Start server
+// ------------------------------------------------------
+const PORT = process.env.PORT || 3000;
 
+initDatabase().then(() => {
+  app.listen(PORT, () => {
+    console.log("XOL API running on port " + PORT);
+  });
+});
